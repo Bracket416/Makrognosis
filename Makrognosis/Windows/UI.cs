@@ -427,11 +427,14 @@ new Modifiers(440, 420, 2780) };
                 var H = (new List<double> { Total, Physical, Magical });
                 var DEF = (new List<double> { Tenacity * Math.Max(Defense, Magical_Defense), Tenacity * Defense, Tenacity * Magical_Defense });
                 var Mechanic = Get_Mechanic_Average(Current_Cast);
-                if ((int)(Mechanic.Item1 * 1.05) >= H[Mechanic.Item2])
+                if (Mechanic.Item1 != 0)
                 {
-                    ImGui.TextColored(0xFF0000FF, "Mechanic Prediction: " + (int)Math.Ceiling(Mechanic.Item1 * 1.05 * (C.Raw ? 1.0 : DEF[Mechanic.Item2])));
+                    if ((int)(Mechanic.Item1 * 1.05) >= H[Mechanic.Item2])
+                    {
+                        ImGui.TextColored(0xFF0000FF, $"{Current_Cast}: " + (int)Math.Ceiling(Mechanic.Item1 * 1.05 * (C.Raw ? 1.0 : DEF[Mechanic.Item2])));
+                    }
+                    else ImGui.TextColored((uint)(0.9924 * uint.MaxValue), $"{Current_Cast}: " + (int)Math.Ceiling(Mechanic.Item1 * 1.05 * (C.Raw ? 1.0 : DEF[Mechanic.Item2])));
                 }
-                else ImGui.TextColored((uint)(0.9924 * uint.MaxValue), "Mechanic Prediction: " + (int)Math.Ceiling(Mechanic.Item1 * 1.05 * (C.Raw ? 1.0 : DEF[Mechanic.Item2])));
                 if (Damage.Count > 0)
                 {
                     var Removed = new List<int>();
