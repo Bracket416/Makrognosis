@@ -427,7 +427,7 @@ new Modifiers(440, 420, 2780) };
                 var H = (new List<double> { Total, Physical, Magical });
                 var DEF = (new List<double> { Tenacity * Math.Max(Defense, Magical_Defense), Tenacity * Defense, Tenacity * Magical_Defense });
                 var Mechanic = Get_Mechanic_Average(Current_Cast);
-                if (Mechanic.Item1 != 0)
+                if (Current_Cast.Length > 0)
                 {
                     if ((int)(Mechanic.Item1 * 1.05) >= H[Mechanic.Item2])
                     {
