@@ -60,7 +60,7 @@ public sealed class Plugin : IDalamudPlugin
             }
             Filtered = $" {Filtered.Trim()} ".Replace(" The ", "").Trim();
 
-            var Enemy = Filtered.Contains(" hits you ") ? Filtered.Split(" hits you ")[0] : Filtered.Split(" readies ")[0].Split(" casts ")[0].Split(" uses ")[0].Split(" take ")[0];
+            var Enemy = Filtered.Contains(" hits you ") ? Filtered.Split(" hits you ")[0] : Filtered.Split(" readies ")[0].Split(" casts ")[0].Split(" uses ")[0].Split(" begins casting ")[0].Split(" take ")[0];
 
             var Final_Name = "";
             foreach (var Word in Enemy.Split(" ")) Final_Name += (Word == "of" ? "of" : Word.FirstCharToUpper()) + " ";
@@ -123,9 +123,9 @@ public sealed class Plugin : IDalamudPlugin
                             }
                         }
                     }
-                    else if (Filtered.Contains(" readies ") || Filtered.Contains(" uses ") || Filtered.Contains(" casts "))
+                    else if (Filtered.Contains(" readies ") || Filtered.Contains(" uses ") || Filtered.Contains(" casts ") || Filtered.Contains(" begins casting "))
                     {
-                        Casts[Enemy] = Filtered.Split(" readies ")[^1].Split(" casts ")[^1].Split(" uses ")[^1];
+                        Casts[Enemy] = Filtered.Split(" readies ")[^1].Split(" casts ")[^1].Split(" uses ")[^1].Split(" begins casting ")[^1];
                         Log.Information($"{Enemy} is casting {Casts[Enemy]}!");
                         if (!Drawing.Mechanics.ContainsKey(Casts[Enemy])) Drawing.Mechanics.Add(Casts[Enemy], []);
                         Last_Caster = Enemy;

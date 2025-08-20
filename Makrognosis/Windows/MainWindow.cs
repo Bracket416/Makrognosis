@@ -17,6 +17,7 @@ public class MainWindow : Window, IDisposable
     private List<string> Types = new List<string> { "", "(Physical)", "(Magical)" };
     public double Defense = 1.0;
     public double Magical_Defense = 1.0;
+    public double Tenacity = 1.0;
 
     public Vector2 P;
 

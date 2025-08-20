@@ -421,11 +421,11 @@ new Modifiers(440, 420, 2780) };
                 Magical = Math.Floor(Magical);
 
                 //var Average_Defense = Math.Min(Defense, Magical_Defense) / Math.Max(Defense, Magical_Defense);
-                ImGui.Text("Total: " + (int)Math.Ceiling(Total * (C.Raw ? 1.0 : Math.Max(Defense, Magical_Defense))));
-                ImGui.Text("Physical: " + (int)Math.Ceiling(Physical * (C.Raw ? 1.0 : Defense)));
-                ImGui.Text("Magical: " + (int)Math.Ceiling(Magical * (C.Raw ? 1.0 : Magical_Defense)));
+                ImGui.Text("Total: " + (int)Math.Ceiling(Total * (C.Raw ? 1.0 : Tenacity * Math.Max(Defense, Magical_Defense))));
+                ImGui.Text("Physical: " + (int)Math.Ceiling(Physical * (C.Raw ? 1.0 : Tenacity * Defense)));
+                ImGui.Text("Magical: " + (int)Math.Ceiling(Magical * (C.Raw ? 1.0 : Tenacity * Magical_Defense)));
                 var H = (new List<double> { Total, Physical, Magical });
-                var DEF = (new List<double> { Math.Max(Defense, Magical_Defense), Defense, Magical_Defense });
+                var DEF = (new List<double> { Tenacity * Math.Max(Defense, Magical_Defense), Tenacity * Defense, Tenacity * Magical_Defense });
                 var Mechanic = Get_Mechanic_Average(Current_Cast);
                 if ((int)(Mechanic.Item1 * 1.05) >= H[Mechanic.Item2])
                 {
@@ -453,6 +453,7 @@ new Modifiers(440, 420, 2780) };
                 Main.Mechanics = Mechanics.Keys.ToList();
                 Main.Defense = Defense;
                 Main.Magical_Defense = Magical_Defense;
+                Main.Tenacity = Tenacity;
             }
         }
 
