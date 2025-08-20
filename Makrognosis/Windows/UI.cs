@@ -389,7 +389,7 @@ new Modifiers(440, 420, 2780) };
 
                 var Statuses = new List<string>();
 
-                Total_Mitigation = 1.0 / Tenacity;
+                Total_Mitigation = 1.0 / Tenacity / Math.Max(Defense, Magical_Defense);
 
                 Total_Physical = 1.0 / Defense / Tenacity;
 
@@ -409,7 +409,7 @@ new Modifiers(440, 420, 2780) };
                         Physical /= (1.0 - Mitigations[Status.StatusId].Item1 / 100.0);
                         Total_Physical /= (1.0 - Mitigations[Status.StatusId].Item1 / 100.0);
                         Magical /= (1.0 - Mitigations[Status.StatusId].Item2 / 100.0);
-                        Total_Magical /= (1.0 - Mitigations[Status.StatusId].Item1 / 100.0);
+                        Total_Magical /= (1.0 - Mitigations[Status.StatusId].Item2 / 100.0);
                     }
                     Reference.TryGetRow(Status.StatusId, out var S);
                     //if (S.Description.ToString().ToLower().Contains("damage taken is reduced") || S.Description.ToString().ToLower().Contains("is nullifying damage") || S.Description.ToString().ToLower().Contains("damage are reduced") || S.Description.ToString().ToLower().Contains("damage is reduced") || S.Description.ToString().ToLower().Contains("damage dealt is reduced"))
@@ -421,9 +421,9 @@ new Modifiers(440, 420, 2780) };
                 Magical = Math.Floor(Magical);
 
                 //var Average_Defense = Math.Min(Defense, Magical_Defense) / Math.Max(Defense, Magical_Defense);
-                ImGui.Text("Total: " + (int)Math.Ceiling(Total * (C.Raw ? 1.0 : Tenacity * Math.Max(Defense, Magical_Defense))));
-                ImGui.Text("Physical: " + (int)Math.Ceiling(Physical * (C.Raw ? 1.0 : Tenacity * Defense)));
-                ImGui.Text("Magical: " + (int)Math.Ceiling(Magical * (C.Raw ? 1.0 : Tenacity * Magical_Defense)));
+                ImGui.Text("Total: " + (int)Math.Ceiling(Total * (C.Raw ? 1.0 : Tenacity * Math.Max(Defense, Magical_Defense))) + $" ({(int)Math.Round(100.0 * (1.0 - (1.0 / (Total_Mitigation * (C.Raw ? 1.0 : Tenacity * Math.Max(Defense, Magical_Defense))))))}%)");
+                ImGui.Text("Physical: " + (int)Math.Ceiling(Physical * (C.Raw ? 1.0 : Tenacity * Defense)) + $" ({(int)Math.Round(100.0 * (1.0 - (1.0 / (Total_Physical * (C.Raw ? 1.0 : Tenacity * Defense)))))}%)");
+                ImGui.Text("Magical: " + (int)Math.Ceiling(Magical * (C.Raw ? 1.0 : Tenacity * Magical_Defense)) + $" ({(int)Math.Round(100.0 * (1.0 - (1.0 / (Total_Magical * (C.Raw ? 1.0 : Tenacity * Magical_Defense)))))}%)");
                 var H = (new List<double> { Total, Physical, Magical });
                 var DEF = (new List<double> { Tenacity * Math.Max(Defense, Magical_Defense), Tenacity * Defense, Tenacity * Magical_Defense });
                 var Mechanic = Get_Mechanic_Average(Current_Cast);
