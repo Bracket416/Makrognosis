@@ -96,11 +96,13 @@ namespace Makrognosis.Windows
                 2679 10 10
                 2674 15 15
                 2675 15 15
-                2829 40 40
                 746 10 20
                 1894 10 20
                 2682 10 10
+                2829 40 40
                 3832 40 40
+                3829 40 40
+                3835 40 40
                 1834 30 30
                 1873 10 10
                 2708 15 15
@@ -433,7 +435,6 @@ new Modifiers(440, 420, 2780) };
 
 
                 if (Target != null && Objects.Contains(Target)) if (Target.StatusList != null) foreach (var Status in Target.StatusList) L.Add(Status);
-                Log.Information("Count: " + L.Count + "");
                 foreach (var Status in State.LocalPlayer.StatusList) L.Add(Status);
                 foreach (var Status in L)
                 {
