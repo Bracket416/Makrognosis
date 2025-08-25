@@ -2,22 +2,27 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin.Services;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Numerics;
-using System.Threading.Tasks;
-using Lumina.Excel.Sheets;
-using FFXIVClientStructs.FFXIV.Component.GUI;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
+using FFXIVClientStructs.FFXIV.Component.GUI;
+using Lumina.Excel.Sheets;
+using Makrognosis.Events;
+using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
+using System.Numerics;
+using System.Text;
+using System.Threading.Tasks;
+using static Dalamud.Interface.Utility.Raii.ImRaii;
 
 namespace Makrognosis.Windows
 {
     unsafe internal class UI : IDisposable
     {
+
+        public Capture Current_Capture;
+
         public Configuration C = new();
 
         public static IClientState State;
@@ -49,6 +54,8 @@ namespace Makrognosis.Windows
         public double Total_Magical = 1.0;
 
         public double Previous_Shield = -1.0;
+
+        public double Previous_Distinct_Shield = 0.0;
 
         public double Compiled_Loss = 0;
 
@@ -85,13 +92,15 @@ namespace Makrognosis.Windows
                 1193 10 10
                 1174 10 10
                 1176 15 15
+                2678 10 10
+                2679 10 10
                 2674 15 15
                 2675 15 15
                 2829 40 40
                 746 10 20
                 1894 10 20
                 2682 10 10
-                3835 40 40
+                3832 40 40
                 1834 30 30
                 1873 10 10
                 2708 15 15
@@ -295,86 +304,108 @@ new Modifiers(440, 420, 2780) };
 
                 ImGui.Begin("##Makro UI", Flags);
 
+
+                var Captured_Damage = Current_Capture.Get_Damage();
+
+                foreach (var M in Captured_Damage.Keys) foreach (var Instance in Captured_Damage[M])
+                    {
+                        var Name = M.ToString();
+                        if (Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Action>().TryGetRow(M, out var N)) Name = N.Name.ExtractText();
+                        Name = (Name.Length == 0 || Name == "Attack" ? "Auto" : Name);
+                        var Mitigation = (new double[] { Total_Mitigation, Total_Physical, Total_Magical })[Instance.Item2];
+                        if (Name == "Auto")
+                        {
+                            Damage.Add(Tuple.Create((int) Math.Ceiling(Instance.Item1 * Mitigation), Instance.Item2, TimeProvider.System.GetTimestamp()));
+                        } else
+                        {
+                            if (!Mechanics.ContainsKey(Name)) Mechanics.Add(Name, new List<Tuple<int, int>> { });
+                            Mechanics[Name].Add(Tuple.Create((int)Math.Ceiling(Instance.Item1 * Mitigation), Instance.Item2));
+                        }
+                            Log.Information($"{Name}: " + (Instance.Item1 * Mitigation));
+                    }
+
                 var Shield = State.LocalPlayer.MaxHp * State.LocalPlayer.ShieldPercentage / 100.0;
 
                 if (Previous_Shield == -1.0) Previous_Shield = Shield;
 
-                var Shield_Increase = Math.Max(0, Shield - Previous_Shield);
+                if (Previous_Shield != Shield) Previous_Distinct_Shield = Previous_Shield;
 
-                Compiled_Gain += Shield_Increase;
-
-                var All_Shields = new List<string>();
-
-                foreach (var Status in State.LocalPlayer.StatusList)
-                {
-                    Reference.TryGetRow(Status.StatusId, out var S);
-                    if (S.Description.ToString().ToLower().Contains(" nulli"))
-                    {
-                        var Name = S.Name.ExtractText();
-                        if (!Shields.ContainsKey(Name)) Shields.Add(Name, Tuple.Create(0.0, 0.0));
-                        if (Shields[Name].Item2 == 0.0 || Shields[Name].Item2 < Status.RemainingTime) if (!New_Shields.Contains(Name))
-                            {
-                                New_Shields.Add(Name);
-                                Log.Information("You gained " + Name + "!");
-                            }
-                        Shields[Name] = Tuple.Create(Shields[Name].Item1, Status.RemainingTime + 0.0);
-                        All_Shields.Add(Name);
-                    }
-                }
-                Gained_Effects.Clear();
-                foreach (var S in Shields.Keys) if (!All_Shields.Contains(S)) Shields[S] = Tuple.Create(Shields[S].Item1, 0.0);
-
-                if (Compiled_Gain > 0.0)
-                {
-                    if (New_Shields.Count > 0)
-                    {
-                        Compiled_Gain /= New_Shields.Count;
-                        foreach (var S in New_Shields)
-                        {
-                            Shields[S] = Tuple.Create(Shields[S].Item1 + Compiled_Gain, Shields[S].Item2);
-                            //Log.Information(S + $" ({(int)Shields[S].Item2}): " + Shields[S].Item1);
-                        }
-                        Compiled_Gain = 0;
-                        New_Shields.Clear();
-                    }
-                }
-
-                var Shield_Damage = Math.Max(0, Previous_Shield - Shield);
-                foreach (var S in Shields.Keys) if (Shields[S].Item2 == 0.0)
-                    {
-                        Shield_Damage -= Shields[S].Item1;
-                        Shields[S] = Tuple.Create(0.0, 0.0);
-                    }
-                var Running_Damage = Shield_Damage;
-                foreach (var S in Shields.Keys)
-                {
-                    if (Shields[S].Item2 != 0.0)
-                    {
-                        var T = Shields[S].Item1 - Running_Damage;
-                        Shields[S] = Tuple.Create(Math.Max(0, T), Shields[S].Item2);
-                        Running_Damage -= Math.Min(0, T);
-                    }
-                    if (Shields[S].Item2 > 0)
-                        Log.Information(S + $" ({(int)Shields[S].Item2}): " + Shields[S].Item1);
-                }
-
-
-                Compiled_Loss += Shield_Damage;
-
-                Compiled_Loss = Math.Max(0, Compiled_Loss);
-
-                if ((Damage_Queue.Count + Mechanic_Queue.Count) > 0) Compiled_Loss /= (Damage_Queue.Count + Mechanic_Queue.Count);
-
-                if (Compiled_Loss > 0 && Damage_Queue.Count + Mechanic_Queue.Count > 0)
-                {
-                    Log.Information(Compiled_Loss + "");
-                    var D = (new List<double> { Total_Mitigation, Total_Physical, Total_Magical });
-                    foreach (var Item in Damage_Queue) Damage.Add(Tuple.Create(Item.Item1 + (int)Math.Ceiling(Compiled_Loss * D[Item.Item2]), Item.Item2, Item.Item3));
-                    foreach (var Item in Mechanic_Queue) Mechanics[Item.Item1].Add(Tuple.Create(Item.Item2 + (int)Math.Ceiling(Compiled_Loss * D[Item.Item3]), Item.Item3));
-                    Compiled_Loss = 0;
-                    Damage_Queue.Clear();
-                    Mechanic_Queue.Clear();
-                }
+                //var Shield_Increase = Math.Max(0, Shield - Previous_Shield);
+                //
+                //Compiled_Gain += Shield_Increase;
+                //
+                //var All_Shields = new List<string>();
+                //
+                //foreach (var Status in State.LocalPlayer.StatusList)
+                //{
+                //    Reference.TryGetRow(Status.StatusId, out var S);
+                //    if (S.Description.ToString().ToLower().Contains(" nulli"))
+                //    {
+                //        var Name = S.Name.ExtractText();
+                //        if (!Shields.ContainsKey(Name)) Shields.Add(Name, Tuple.Create(0.0, 0.0));
+                //        if (Shields[Name].Item2 == 0.0 || Shields[Name].Item2 < Status.RemainingTime) if (!New_Shields.Contains(Name))
+                //            {
+                //                New_Shields.Add(Name);
+                //                // Log.Information("You gained " + Name + "!");
+                //            }
+                //        Shields[Name] = Tuple.Create(Shields[Name].Item1, Status.RemainingTime + 0.0);
+                //        All_Shields.Add(Name);
+                //    }
+                //}
+                //Gained_Effects.Clear();
+                //foreach (var S in Shields.Keys) if (!All_Shields.Contains(S)) Shields[S] = Tuple.Create(Shields[S].Item1, 0.0);
+                //
+                //if (Compiled_Gain > 0.0)
+                //{
+                //    if (New_Shields.Count > 0)
+                //    {
+                //        Compiled_Gain /= New_Shields.Count;
+                //        foreach (var S in New_Shields)
+                //        {
+                //            Shields[S] = Tuple.Create(Shields[S].Item1 + Compiled_Gain, Shields[S].Item2);
+                //            //Log.Information(S + $" ({(int)Shields[S].Item2}): " + Shields[S].Item1);
+                //        }
+                //        Compiled_Gain = 0;
+                //        New_Shields.Clear();
+                //    }
+                //}
+                //
+                //var Shield_Damage = Math.Max(0, Previous_Shield - Shield);
+                //foreach (var S in Shields.Keys) if (Shields[S].Item2 == 0.0)
+                //    {
+                //        Shield_Damage -= Shields[S].Item1;
+                //        Shields[S] = Tuple.Create(0.0, 0.0);
+                //    }
+                //var Running_Damage = Shield_Damage;
+                //foreach (var S in Shields.Keys)
+                //{
+                //    if (Shields[S].Item2 != 0.0)
+                //    {
+                //        var T = Shields[S].Item1 - Running_Damage;
+                //        Shields[S] = Tuple.Create(Math.Max(0, T), Shields[S].Item2);
+                //        Running_Damage -= Math.Min(0, T);
+                //    }
+                //    //if (Shields[S].Item2 > 0)
+                //    //    Log.Information(S + $" ({(int)Shields[S].Item2}): " + Shields[S].Item1);
+                //}
+                //
+                //
+                //Compiled_Loss += Shield_Damage;
+                //
+                //Compiled_Loss = Math.Max(0, Compiled_Loss);
+                //
+                //if ((Damage_Queue.Count + Mechanic_Queue.Count) > 0) Compiled_Loss /= (Damage_Queue.Count + Mechanic_Queue.Count);
+                //
+                //if (Compiled_Loss > 0 && Damage_Queue.Count + Mechanic_Queue.Count > 0)
+                //{
+                //    //Log.Information(Compiled_Loss + "");
+                //    var D = (new List<double> { Total_Mitigation, Total_Physical, Total_Magical });
+                //    foreach (var Item in Damage_Queue) Damage.Add(Tuple.Create(Item.Item1 + (int)Math.Ceiling(Compiled_Loss * D[Item.Item2]), Item.Item2, Item.Item3));
+                //    foreach (var Item in Mechanic_Queue) Mechanics[Item.Item1].Add(Tuple.Create(Item.Item2 + (int)Math.Ceiling(Compiled_Loss * D[Item.Item3]), Item.Item3));
+                //    Compiled_Loss = 0;
+                //    Damage_Queue.Clear();
+                //    Mechanic_Queue.Clear();
+                //}
 
 
                 Previous_Shield = Shield;
@@ -394,11 +425,15 @@ new Modifiers(440, 420, 2780) };
                 Total_Physical = 1.0 / Defense / Tenacity;
 
                 Total_Magical = 1.0 / Magical_Defense / Tenacity;
-
-                if (State.LocalPlayer.TargetObject != null && State.LocalPlayer.TargetObject is Dalamud.Game.ClientState.Objects.Types.IBattleNpc) Target = (Dalamud.Game.ClientState.Objects.Types.IBattleNpc)State.LocalPlayer.TargetObject;
+                
                 var L = new List<Dalamud.Game.ClientState.Statuses.Status>();
 
+                if (State.LocalPlayer.TargetObject != null && State.LocalPlayer.TargetObject is Dalamud.Game.ClientState.Objects.Types.IBattleNpc) Target = (Dalamud.Game.ClientState.Objects.Types.IBattleNpc)State.LocalPlayer.TargetObject;
+                //if (State.LocalPlayer.TargetObject != null && State.LocalPlayer.TargetObject is Dalamud.Game.ClientState.Objects.Types.IBattleChara) foreach (var Status in ((Dalamud.Game.ClientState.Objects.Types.IBattleChara) State.LocalPlayer.TargetObject).StatusList) L.Add(Status);
+
+
                 if (Target != null && Objects.Contains(Target)) if (Target.StatusList != null) foreach (var Status in Target.StatusList) L.Add(Status);
+                Log.Information("Count: " + L.Count + "");
                 foreach (var Status in State.LocalPlayer.StatusList) L.Add(Status);
                 foreach (var Status in L)
                 {
@@ -419,9 +454,9 @@ new Modifiers(440, 420, 2780) };
                 Total = Math.Floor(Total / Math.Max(Defense, Magical_Defense) / Tenacity);
                 Physical = Math.Floor(Physical);
                 Magical = Math.Floor(Magical);
-
                 //var Average_Defense = Math.Min(Defense, Magical_Defense) / Math.Max(Defense, Magical_Defense);
-                ImGui.Text("Total: " + (int)Math.Ceiling(Total * (C.Raw ? 1.0 : Tenacity * Math.Max(Defense, Magical_Defense))) + $" ({(int)Math.Round(100.0 * (1.0 - (1.0 / (Total_Mitigation * (C.Raw ? 1.0 : Tenacity * Math.Max(Defense, Magical_Defense))))))}%)");
+                UInt32[] Color_Category = new UInt32[] { 0xFF0000FF, 0xFF00FFFF, (uint)(0.9924 * uint.MaxValue) };
+                ImGui.TextColored(Color_Category[(int)(Math.Min(Color_Category.Length - 1, Math.Max(0, Color_Category.Length * Total / Math.Floor(State.LocalPlayer.MaxHp / Math.Max(Defense, Magical_Defense) / Tenacity))))], "Total: " + (int)Math.Ceiling(Total * (C.Raw ? 1.0 : Tenacity * Math.Max(Defense, Magical_Defense))) + $" ({(int)Math.Round(100.0 * (1.0 - (1.0 / (Total_Mitigation * (C.Raw ? 1.0 : Tenacity * Math.Max(Defense, Magical_Defense))))))}%)");
                 ImGui.Text("Physical: " + (int)Math.Ceiling(Physical * (C.Raw ? 1.0 : Tenacity * Defense)) + $" ({(int)Math.Round(100.0 * (1.0 - (1.0 / (Total_Physical * (C.Raw ? 1.0 : Tenacity * Defense)))))}%)");
                 ImGui.Text("Magical: " + (int)Math.Ceiling(Magical * (C.Raw ? 1.0 : Tenacity * Magical_Defense)) + $" ({(int)Math.Round(100.0 * (1.0 - (1.0 / (Total_Magical * (C.Raw ? 1.0 : Tenacity * Magical_Defense)))))}%)");
                 var H = (new List<double> { Total, Physical, Magical });
@@ -440,11 +475,19 @@ new Modifiers(440, 420, 2780) };
                     var Removed = new List<int>();
                     var T = TimeProvider.System.GetTimestamp();
                     var Average = 0.0;
-                    foreach (var Item in Damage) Average += Item.Item1;
-                    Average /= Damage.Count;
+                    var Count = 0;
+                    for (var I = 0; I < Damage.Count; I++) if (T - Damage[I].Item3 > 10000)
+                        {
+                            Average += Damage[I].Item1;
+                            Count++;
+                        }
+                        else
+                            Removed.Add(I);
+
+                    Average /= Count;
                     Average *= 1.05;
 
-                    ImGui.TextColored(Average >= Total ? 0xFF0000FF : (uint)(0.9924 * uint.MaxValue), "Auto: " + (int)Math.Ceiling(Average * (C.Raw ? 1.0 : DEF[0])));
+                    ImGui.TextColored(1.5 * Average >= Total ? 0xFF0000FF : (uint)(0.9924 * uint.MaxValue), "Auto: " + (int)Math.Ceiling(Average * (C.Raw ? 1.0 : DEF[0])));
                     ImGui.Text("ETD: " + (int)(10.0 * (Total / (Average / 3))) / 10.0 + "s");
                 }
 

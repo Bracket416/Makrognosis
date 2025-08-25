@@ -41,7 +41,15 @@ public sealed class Plugin : IDalamudPlugin
 
     private Dictionary<string, string> Casts = new();
 
-    private string Last_Caster = "";
+    private Events.Capture C;
+
+    public double Get_Shield()
+    {
+
+        var Previous = Drawing.Previous_Distinct_Shield;
+        Drawing.Previous_Distinct_Shield = ClientState.LocalPlayer.MaxHp * ClientState.LocalPlayer.ShieldPercentage / 100.0;
+        return Previous;
+    }
 
     public Tuple<double, int> Average(string Name)
     {
@@ -75,69 +83,23 @@ public sealed class Plugin : IDalamudPlugin
             }
             if (Filtered.StartsWith("You gain the effect of ")) Drawing.Gained_Effects.Add(Filtered.Split("You gain the effect of ")[1]);
             if (Drawing.Target != null && ClientState.LocalPlayer != null)
-                if (Drawing.Target.Name.TextValue == Enemy || Enemy == "You")
-                {
-                    if (Filtered.EndsWith(" damage"))
-                    {
-                        if (Filtered.Contains("hits you for"))
-                        {
-                            var Damage = int.Parse(Filtered.Split(" damage")[0].Split(" ")[^1].Split("(")[0]);
-                            var Type = 0;
-                            if (message.Payloads.Count == 3)
-                            {
-                                if (((Dalamud.Game.Text.SeStringHandling.Payloads.IconPayload)message.Payloads[1]).Icon.ToString().Contains("Magical"))
-                                {
-                                    Type = 2;
-                                }
-                                else Type = 1;
-                            }
-                            var D = (new List<double> { Drawing.Total_Mitigation, Drawing.Total_Physical, Drawing.Total_Magical });
-                            if (Drawing.Previous_Shield > 0.0)
-                            {
-                                Drawing.Damage_Queue.Add(Tuple.Create((int)Math.Ceiling(Damage * D[Type] / (message.TextValue.StartsWith("Parried!") || message.TextValue.StartsWith("Blocked!") ? 0.85 : 1.0)), Type, TimeProvider.System.GetTimestamp()));
-                            }
-                            else Drawing.Damage.Add(Tuple.Create((int)Math.Ceiling(Damage * D[Type] / (message.TextValue.StartsWith("Parried!") || message.TextValue.StartsWith("Blocked!") ? 0.85 : 1.0)), Type, TimeProvider.System.GetTimestamp()));
-                        }
-                        else if (Filtered.StartsWith("You take"))
-                        {
-                            var Damage = int.Parse(Filtered.Split(" damage")[0].Split(" ")[^1].Split("(")[0]);
-                            var Type = 0;
-                            if (message.Payloads.Count == 3)
-                            {
-                                if (((Dalamud.Game.Text.SeStringHandling.Payloads.IconPayload)message.Payloads[1]).Icon.ToString().Contains("Magical"))
-                                {
-                                    Type = 2;
-                                }
-                                else Type = 1;
-                            }
-
-                            if (Casts.ContainsKey(Last_Caster))
-                            {
-                                if (!Drawing.Mechanics.ContainsKey(Casts[Last_Caster])) Drawing.Mechanics.Add(Casts[Last_Caster], []);
-                                var D = (new List<double> { Drawing.Total_Mitigation, Drawing.Total_Physical, Drawing.Total_Magical });
-                                if (Drawing.Previous_Shield > 0.0)
-                                {
-                                    Drawing.Mechanic_Queue.Add(Tuple.Create(Casts[Last_Caster], (int)Math.Ceiling(Damage * D[Type] / (message.TextValue.StartsWith("Parried!") || message.TextValue.StartsWith("Blocked!") ? 0.85 : 1.0)), Type));
-                                }
-                                else Drawing.Mechanics[Casts[Last_Caster]].Add(Tuple.Create((int)Math.Ceiling(Damage * D[Type] / (message.TextValue.StartsWith("Parried!") || message.TextValue.StartsWith("Blocked!") ? 0.85 : 1.0)), Type));
-                            }
-                        }
-                    }
-                    else if (Filtered.Contains(" readies ") || Filtered.Contains(" uses ") || Filtered.Contains(" casts ") || Filtered.Contains(" begins casting "))
+                if (Drawing.Target.Name.TextValue == Enemy || Enemy == "You") if (Filtered.Contains(" readies ") || Filtered.Contains(" uses ") || Filtered.Contains(" casts ") || Filtered.Contains(" begins casting "))
                     {
                         Casts[Enemy] = Filtered.Split(" readies ")[^1].Split(" casts ")[^1].Split(" uses ")[^1].Split(" begins casting ")[^1];
                         Log.Information($"{Enemy} is casting {Casts[Enemy]}!");
                         if (!Drawing.Mechanics.ContainsKey(Casts[Enemy])) Drawing.Mechanics.Add(Casts[Enemy], []);
-                        Last_Caster = Enemy;
                         Drawing.Current_Cast = Casts[Enemy];
                     }
-                }
         }
     }
 
     public Plugin(IDalamudPluginInterface I)
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+
+        Events.Capture.Log = Log;
+        Events.Capture.Client = ClientState;
+        C = new(this, I);
 
 
         // You might normally want to embed resources and load them from the manifest stream
@@ -146,10 +108,12 @@ public sealed class Plugin : IDalamudPlugin
 
         Drawing.C = Configuration;
         Drawing.Mechanics = Configuration.Mechanics ?? new();
+
         UI.Objects = Objects;
         UI.State = ClientState;
         UI.Main = MainWindow;
         UI.Log = Log;
+        Drawing.Current_Capture = C;
         Chat.ChatMessage += Message;
         WindowSystem.AddWindow(ConfigWindow);
         WindowSystem.AddWindow(MainWindow);
