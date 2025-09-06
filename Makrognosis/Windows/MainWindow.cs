@@ -18,6 +18,7 @@ public class MainWindow : Window, IDisposable
     public double Defense = 1.0;
     public double Magical_Defense = 1.0;
     public double Tenacity = 1.0;
+    public bool Drawing = true;
 
     public Vector2 P;
 
@@ -42,10 +43,7 @@ public class MainWindow : Window, IDisposable
 
     public override void Draw()
     {
-        //FFXIVClientStructs.FFXIV.Client.Game.ActionManager.
-        // Normally a BeginChild() would have to be followed by an unconditional EndChild(),
-        // ImRaii takes care of this after the scope ends.
-        // This works for all ImGui functions that require specific handling, examples are BeginTable() or Indent().
+        Drawing = true;
         using (var child = ImRaii.Child("SomeChildWithAScrollbar", Vector2.Zero, true))
         {
             // Check if this child is drawing

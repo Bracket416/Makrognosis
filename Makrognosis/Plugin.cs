@@ -1,18 +1,22 @@
+using Dalamud.Game;
+using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Command;
 using Dalamud.Game.Text;
+using Dalamud.Game.Text.SeStringHandling;
+using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Interface;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using Dalamud.Utility;
+using FFXIVClientStructs.FFXIV.Client.System.Framework;
 using Makrognosis.Windows;
-using Dalamud.Game.Text.SeStringHandling;
-using Dalamud.Game.Text.SeStringHandling.Payloads;
-using System.IO;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using Dalamud.Utility;
+using System.Text.RegularExpressions;
 
 namespace Makrognosis;
 
@@ -26,7 +30,8 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IObjectTable Objects { get; private set; } = null!;
     [PluginService] internal static IPartyList Party { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
-
+    [PluginService] internal static IFramework Framework { get; private set; } = null!;
+    [PluginService] internal static ISigScanner Scanner {  get; private set; } = null!;
     [PluginService] internal static IChatGui Chat { get; private set; } = null!;
 
     private const string CommandName = "/makro";
@@ -45,9 +50,8 @@ public sealed class Plugin : IDalamudPlugin
 
     public double Get_Shield()
     {
-
         var Previous = Drawing.Previous_Distinct_Shield;
-        Drawing.Previous_Distinct_Shield = ClientState.LocalPlayer.MaxHp * ClientState.LocalPlayer.ShieldPercentage / 100.0;
+        if (ClientState.LocalPlayer is not null) Drawing.Previous_Distinct_Shield = ClientState.LocalPlayer.MaxHp * ClientState.LocalPlayer.ShieldPercentage / 100.0;
         return Previous;
     }
 
@@ -58,12 +62,12 @@ public sealed class Plugin : IDalamudPlugin
 
     private void Message(XivChatType type, int timestamp, ref SeString sender, ref SeString message, ref bool isHandled)
     {
-        if (sender.TextValue.Length == 0)
+        if (ClientState.LocalPlayer is not null) if (sender.TextValue.Length == 0)
         {
             var Filtered = "";
             foreach (var Word in message.TextValue.Replace("Parried! ", "").Replace("Blocked!", "").Split(" "))
             {
-                for (int I = 0; I < Word.Length; I++) if (Word.ToLower().ToCharArray()[I] != Word.ToUpper().ToCharArray()[I] || "0123456789".Contains(Word.ToCharArray()[I]) || "()".Contains(Word.ToCharArray()[I])) Filtered += Word.ToCharArray()[I];
+                for (var I = 0; I < Word.Length; I++) if (Word.ToLower().ToCharArray()[I] != Word.ToUpper().ToCharArray()[I] || "0123456789".Contains(Word.ToCharArray()[I]) || "()".Contains(Word.ToCharArray()[I])) Filtered += Word.ToCharArray()[I];
                 Filtered += " ";
             }
             Filtered = $" {Filtered.Trim()} ".Replace(" The ", "").Trim();
@@ -82,7 +86,7 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
             if (Filtered.StartsWith("You gain the effect of ")) Drawing.Gained_Effects.Add(Filtered.Split("You gain the effect of ")[1]);
-            if (Drawing.Target != null && ClientState.LocalPlayer != null)
+            if (Drawing.Target is not null && Drawing.Target is IBattleNpc)
                 if (Drawing.Target.Name.TextValue == Enemy || Enemy == "You") if (Filtered.Contains(" readies ") || Filtered.Contains(" uses ") || Filtered.Contains(" casts ") || Filtered.Contains(" begins casting "))
                     {
                         Casts[Enemy] = Filtered.Split(" readies ")[^1].Split(" casts ")[^1].Split(" uses ")[^1].Split(" begins casting ")[^1];
@@ -99,7 +103,7 @@ public sealed class Plugin : IDalamudPlugin
 
         Events.Capture.Log = Log;
         Events.Capture.Client = ClientState;
-        C = new(this, I);
+        C = new(this, I, Scanner);
 
 
         // You might normally want to embed resources and load them from the manifest stream
@@ -113,6 +117,7 @@ public sealed class Plugin : IDalamudPlugin
         UI.State = ClientState;
         UI.Main = MainWindow;
         UI.Log = Log;
+        UI.Manager = DataManager;
         Drawing.Current_Capture = C;
         Chat.ChatMessage += Message;
         WindowSystem.AddWindow(ConfigWindow);
@@ -121,6 +126,9 @@ public sealed class Plugin : IDalamudPlugin
         {
             HelpMessage = "A useful message to display in /xlhelp"
         });
+
+        Framework.Update += C.Update;
+        Framework.Update += Drawing.Update;
 
         PluginInterface.UiBuilder.Draw += DrawUI;
 
@@ -143,7 +151,7 @@ public sealed class Plugin : IDalamudPlugin
         ConfigWindow.Dispose();
         MainWindow.Dispose();
         Drawing.Dispose();
-
+        C.Dispose();
         CommandManager.RemoveHandler(CommandName);
     }
 
