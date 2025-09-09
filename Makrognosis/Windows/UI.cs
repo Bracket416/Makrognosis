@@ -399,8 +399,6 @@ new Modifiers(440, 420, 2780) };
                         var Status = Entry.Key;
                         if (Mitigations.ContainsKey(Status))
                         {
-                            Log.Information(Entry.Key + "");
-                            Log.Information(Entry.Value + "");
                             if (Mitigations[Status].Item1 == Mitigations[Status].Item2) Total /= (1.0 - Mitigations[Status].Item1 / 100.0);
                             if (Mitigations[Status].Item1 == Mitigations[Status].Item2) Total_Mitigation /= (1.0 - Mitigations[Status].Item1 / 100.0);
                             Physical /= (1.0 - Mitigations[Status].Item1 / 100.0);
