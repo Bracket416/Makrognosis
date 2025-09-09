@@ -31,7 +31,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IPartyList Party { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
-    [PluginService] internal static ISigScanner Scanner {  get; private set; } = null!;
+    [PluginService] internal static ISigScanner Scanner { get; private set; } = null!;
     [PluginService] internal static IChatGui Chat { get; private set; } = null!;
 
     private const string CommandName = "/makro";
@@ -63,38 +63,37 @@ public sealed class Plugin : IDalamudPlugin
     private void Message(XivChatType type, int timestamp, ref SeString sender, ref SeString message, ref bool isHandled)
     {
         if (ClientState.LocalPlayer is not null) if (sender.TextValue.Length == 0)
-        {
-            var Filtered = "";
-            foreach (var Word in message.TextValue.Replace("Parried! ", "").Replace("Blocked!", "").Split(" "))
             {
-                for (var I = 0; I < Word.Length; I++) if (Word.ToLower().ToCharArray()[I] != Word.ToUpper().ToCharArray()[I] || "0123456789".Contains(Word.ToCharArray()[I]) || "()".Contains(Word.ToCharArray()[I])) Filtered += Word.ToCharArray()[I];
-                Filtered += " ";
-            }
-            Filtered = $" {Filtered.Trim()} ".Replace(" The ", "").Trim();
+                var Filtered = "";
+                foreach (var Word in message.TextValue.Replace("Parried! ", "").Replace("Blocked!", "").Split(" "))
+                {
+                    for (var I = 0; I < Word.Length; I++) if (Word.ToLower().ToCharArray()[I] != Word.ToUpper().ToCharArray()[I] || "0123456789".Contains(Word.ToCharArray()[I]) || "()".Contains(Word.ToCharArray()[I])) Filtered += Word.ToCharArray()[I];
+                    Filtered += " ";
+                }
+                Filtered = $" {Filtered.Trim()} ".Replace(" The ", "").Trim();
 
-            var Enemy = Filtered.Contains(" hits you ") ? Filtered.Split(" hits you ")[0] : Filtered.Split(" readies ")[0].Split(" casts ")[0].Split(" uses ")[0].Split(" begins casting ")[0].Split(" take ")[0];
+                var Enemy = Filtered.Contains(" hits you ") ? Filtered.Split(" hits you ")[0] : Filtered.Split(" readies ")[0].Split(" casts ")[0].Split(" uses ")[0].Split(" begins casting ")[0].Split(" take ")[0];
 
-            var Final_Name = "";
-            foreach (var Word in Enemy.Split(" ")) Final_Name += (Word == "of" ? "of" : Word.FirstCharToUpper()) + " ";
+                var Final_Name = "";
+                foreach (var Word in Enemy.Split(" ")) Final_Name += (Word == "of" ? "of" : Word.FirstCharToUpper()) + " ";
 
-            Enemy = Final_Name.Trim();
+                Enemy = Final_Name.Trim();
 
-            if (Filtered.StartsWith("You are defeated"))
-            {
-                Drawing.Damage = new();
-                Configuration.Mechanics = Drawing.Mechanics;
-                Configuration.Save();
-            }
-            if (Filtered.StartsWith("You gain the effect of ")) Drawing.Gained_Effects.Add(Filtered.Split("You gain the effect of ")[1]);
-            if (Drawing.Target is not null && Drawing.Target is IBattleNpc)
-                if (Drawing.Target.Name.TextValue == Enemy || Enemy == "You") if (Filtered.Contains(" readies ") || Filtered.Contains(" uses ") || Filtered.Contains(" casts ") || Filtered.Contains(" begins casting "))
+                if (Filtered.StartsWith("You are defeated"))
+                {
+                    Drawing.Damage = new();
+                    Configuration.Mechanics = Drawing.Mechanics;
+                    Configuration.Save();
+                }
+                if (Filtered.StartsWith("You gain the effect of ")) Drawing.Gained_Effects.Add(Filtered.Split("You gain the effect of ")[1]);
+                if (UI.Target_Name == Enemy || Enemy == "You") if (Filtered.Contains(" readies ") || Filtered.Contains(" uses ") || Filtered.Contains(" casts ") || Filtered.Contains(" begins casting "))
                     {
                         Casts[Enemy] = Filtered.Split(" readies ")[^1].Split(" casts ")[^1].Split(" uses ")[^1].Split(" begins casting ")[^1];
                         Log.Information($"{Enemy} is casting {Casts[Enemy]}!");
                         if (!Drawing.Mechanics.ContainsKey(Casts[Enemy])) Drawing.Mechanics.Add(Casts[Enemy], []);
                         Drawing.Current_Cast = Casts[Enemy];
                     }
-        }
+            }
     }
 
     public Plugin(IDalamudPluginInterface I)

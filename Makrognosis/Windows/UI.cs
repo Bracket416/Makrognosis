@@ -1,4 +1,5 @@
 using Dalamud.Bindings.ImGui;
+using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
@@ -43,8 +44,6 @@ namespace Makrognosis.Windows
 
         public Vector2 Local_Position = new Vector2();
 
-        public IGameObject Target;
-
         public List<Tuple<int, int, long>> Damage = new();
 
         public Dictionary<string, List<Tuple<int, int>>> Mechanics = new();
@@ -75,13 +74,15 @@ namespace Makrognosis.Windows
 
         public List<string> Gained_Effects = new();
 
-        private static uint Target_Entity_ID;
-
-        private static long Last_Target_Time = 0;
-
         public static IPluginLog Log;
 
         public static IDataManager Manager;
+
+        public static string Target_Name = string.Empty;
+
+        private static Dictionary<uint, double> Self_Timers = new();
+
+        private static Dictionary<uint, double> Target_Timers = new();
 
         public double Defense = 1.0;
         public double Magical_Defense = 1.0;
@@ -306,6 +307,7 @@ new Modifiers(440, 420, 2780) };
         {
             try
             {
+                foreach (var Key in Target_Timers.Keys) Target_Timers[Key] = Math.Max(0, Target_Timers[Key] - F.UpdateDelta.TotalSeconds);
                 if (State.LocalPlayer is not null)
                 {
                     if (State.MapId != Map_ID)
@@ -365,44 +367,50 @@ new Modifiers(440, 420, 2780) };
 
                     Magical = Total / Magical_Defense / Tenacity;
 
-                    var Statuses = new List<string>();
-
                     Total_Mitigation = 1.0 / Tenacity / Math.Max(Defense, Magical_Defense);
 
                     Total_Physical = 1.0 / Defense / Tenacity;
 
                     Total_Magical = 1.0 / Magical_Defense / Tenacity;
 
-                    var L = new List<Dalamud.Game.ClientState.Statuses.Status>();
+                    if (State.LocalPlayer is IBattleChara Battle_Player) if (Battle_Player is not null)
+                        {
+                            List<uint> Current = new();
+                            foreach (var Status in Battle_Player.StatusList)
+                            {
+                                Current.Add(Status.StatusId);
+                                Self_Timers[Status.StatusId] = Status.RemainingTime;
+                            }
+                            var Keys = Self_Timers.Keys.ToArray();
+                            foreach (var Key in Keys) if (!Current.Contains(Key)) Self_Timers.Remove(Key);
+                        }
 
-                    //if (State.LocalPlayer.TargetObject is not null && State.LocalPlayer.TargetObject is Dalamud.Game.ClientState.Objects.Types.IBattleChara) foreach (var Status in ((Dalamud.Game.ClientState.Objects.Types.IBattleChara) State.LocalPlayer.TargetObject).StatusList) L.Add(Status);
-                    var T = TimeProvider.System.GetTimestamp();
-                    if (State.LocalPlayer.TargetObject is not null)
+                    if (State.LocalPlayer.TargetObject is not null) if (State.LocalPlayer.TargetObject is IBattleNpc Battle_Target) if (Battle_Target.BattleNpcKind == BattleNpcSubKind.Enemy)
+                            {
+                                Target_Name = Battle_Target.Name.TextValue;
+                                foreach (var Status in Battle_Target.StatusList) Target_Timers[Status.StatusId] = Status.RemainingTime;
+                            }
+
+                    var Timers = Target_Timers.AsEnumerable().Concat(Self_Timers);
+
+                    foreach (var Entry in Timers)
                     {
-                        if (State.LocalPlayer.TargetObject is IBattleNpc)
+                        if (Entry.Value <= 0) continue;
+                        var Status = Entry.Key;
+                        if (Mitigations.ContainsKey(Status))
                         {
-                            Target = State.LocalPlayer.TargetObject;
-                            Target_Entity_ID = Target.EntityId;
-                            Last_Target_Time = T;
+                            Log.Information(Entry.Key + "");
+                            Log.Information(Entry.Value + "");
+                            if (Mitigations[Status].Item1 == Mitigations[Status].Item2) Total /= (1.0 - Mitigations[Status].Item1 / 100.0);
+                            if (Mitigations[Status].Item1 == Mitigations[Status].Item2) Total_Mitigation /= (1.0 - Mitigations[Status].Item1 / 100.0);
+                            Physical /= (1.0 - Mitigations[Status].Item1 / 100.0);
+                            Total_Physical /= (1.0 - Mitigations[Status].Item1 / 100.0);
+                            Magical /= (1.0 - Mitigations[Status].Item2 / 100.0);
+                            Total_Magical /= (1.0 - Mitigations[Status].Item2 / 100.0);
                         }
-                    }
-                    else if (Target is not null) if (Target is not IBattleNpc || Target.EntityId != Target_Entity_ID || T - Last_Target_Time > 175000000.0) Target = null;
-                    if (Target is not null && (Target is IBattleNpc Battle_Target) && Objects.Contains(Target)) if (Battle_Target is not null) foreach (var Status in Battle_Target.StatusList) L.Add(Status);
-                    if (State.LocalPlayer is IBattleChara Battle_Player) if (Battle_Player is not null) foreach (var Status in Battle_Player.StatusList) L.Add(Status);
-                    foreach (var Status in L)
-                    {
-                        if (Mitigations.ContainsKey(Status.StatusId))
-                        {
-                            if (Mitigations[Status.StatusId].Item1 == Mitigations[Status.StatusId].Item2) Total /= (1.0 - Mitigations[Status.StatusId].Item1 / 100.0);
-                            if (Mitigations[Status.StatusId].Item1 == Mitigations[Status.StatusId].Item2) Total_Mitigation /= (1.0 - Mitigations[Status.StatusId].Item1 / 100.0);
-                            Physical /= (1.0 - Mitigations[Status.StatusId].Item1 / 100.0);
-                            Total_Physical /= (1.0 - Mitigations[Status.StatusId].Item1 / 100.0);
-                            Magical /= (1.0 - Mitigations[Status.StatusId].Item2 / 100.0);
-                            Total_Magical /= (1.0 - Mitigations[Status.StatusId].Item2 / 100.0);
-                        }
-                        Reference.TryGetRow(Status.StatusId, out var S);
-                        if (S.Description.ToString().ToLower().Contains("damage taken is reduced") || S.Description.ToString().ToLower().Contains("is nullifying damage") || S.Description.ToString().ToLower().Contains("damage are reduced") || S.Description.ToString().ToLower().Contains("damage is reduced") || S.Description.ToString().ToLower().Contains("damage dealt is reduced"))
-                            Statuses.Add(S.Name.ExtractText() + $" ({Status.StatusId})");
+                        Reference.TryGetRow(Status, out var S);
+                        //if (S.Description.ToString().ToLower().Contains("damage taken is reduced") || S.Description.ToString().ToLower().Contains("is nullifying damage") || S.Description.ToString().ToLower().Contains("damage are reduced") || S.Description.ToString().ToLower().Contains("damage is reduced") || S.Description.ToString().ToLower().Contains("damage dealt is reduced"))
+                        //    Statuses.Add(S.Name.ExtractText() + $" ({Status.StatusId})");
                     }
                     Total = Math.Floor(Total / Math.Max(Defense, Magical_Defense) / Tenacity);
                     Physical = Math.Floor(Physical);
