@@ -7,6 +7,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.Havok.Common.Base.Math.QsTransform;
 using Lumina.Data.Parsing;
+using Makrognosis.Windows;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -59,6 +60,9 @@ namespace Makrognosis.Events
                 if (Header->NumTargets > 0 && Client.LocalPlayer is not null)
                 {
                     var ID = Header->SpellId;
+                    if (ID == 7560) UI.Target_Timers[1203] = 14.8;
+                    if (ID == 7549) UI.Target_Timers[1195] = 14.8;
+                    if (ID == 7535) UI.Target_Timers[1193] = 14.8;
                     for (var I = 0; I < Header->NumTargets; I++) if ((uint)(Target_IDs[I] & uint.MaxValue) == Client.LocalPlayer.GameObjectId)
                         {
                             var S = Client.LocalPlayer.MaxHp * Client.LocalPlayer.ShieldPercentage / 100.0;

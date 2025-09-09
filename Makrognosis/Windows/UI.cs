@@ -80,9 +80,9 @@ namespace Makrognosis.Windows
 
         public static string Target_Name = string.Empty;
 
-        private static Dictionary<uint, double> Self_Timers = new();
+        public static Dictionary<uint, double> Self_Timers = new();
 
-        private static Dictionary<uint, double> Target_Timers = new();
+        public static Dictionary<uint, double> Target_Timers = new();
 
         public double Defense = 1.0;
         public double Magical_Defense = 1.0;
