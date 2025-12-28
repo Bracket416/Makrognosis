@@ -48,9 +48,7 @@ namespace Makrognosis.Events
                 Service.GameInteropProvider.HookFromSignature<ProcessPacketActionEffectDelegate>(ActionEffectHandler.Addresses.Receive.String,
                     ProcessPacketActionEffectDetour);
             Action_Hook.Enable();
-
         }
-
         private unsafe void ProcessPacketActionEffectDetour(uint User_ID, Character* User_Pointer, Vector3* Target_Position, ActionEffectHandler.Header* Header, ActionEffectHandler.TargetEffects* Effects, GameObjectId* Target_IDs)
         {
             Action_Hook.Original(User_ID, User_Pointer, Target_Position, Header, Effects, Target_IDs);

@@ -172,15 +172,15 @@ namespace Makrognosis.Windows
 
             return Output;
         }
-        public Tuple<double, int> Get_Mechanic_Average(string Name)
+        public Tuple<double, int> Get_Mechanic_Damage(string Name)
         {
             if (!Mechanics.ContainsKey(Name)) return Tuple.Create(0.0, 0);
             if (Mechanics[Name].Count == 0) return Tuple.Create(0.0, 0);
             var Cleaned = Clean(Mechanics[Name], 0.05);
-            var Sum = 0.0;
             if (Cleaned.Count == 0) return new Tuple<double, int>(0.0, 0);
-            foreach (var D in Cleaned) Sum += D.Item1;
-            return Tuple.Create(Sum / Cleaned.Count, Mechanics[Name][0].Item2);
+            var Minimum = double.PositiveInfinity;
+            foreach (var D in Cleaned) Minimum = Math.Min(Minimum, D.Item1);
+            return Tuple.Create(Minimum / 0.95 * 1.05, Mechanics[Name][0].Item2);
         }
         public class Modifiers
         {
@@ -448,7 +448,7 @@ new Modifiers(440, 420, 2780) };
                         ImGui.Text("Magical: " + (int)Math.Ceiling(Magical * (C.Raw ? 1.0 : Tenacity * Magical_Defense)) + $" ({(int)Math.Round(100.0 * (1.0 - (1.0 / (Total_Magical * (C.Raw ? 1.0 : Tenacity * Magical_Defense)))))}%)");
                         var H = (new List<double> { Total, Physical, Magical });
                         var DEF = (new List<double> { Tenacity * Math.Max(Defense, Magical_Defense), Tenacity * Defense, Tenacity * Magical_Defense });
-                        var Mechanic = Get_Mechanic_Average(Current_Cast);
+                        var Mechanic = Get_Mechanic_Damage(Current_Cast);
                         if (Current_Cast.Length > 0)
                         {
                             if ((int)(Mechanic.Item1 * 1.05) >= H[Mechanic.Item2])

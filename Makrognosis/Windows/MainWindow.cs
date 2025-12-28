@@ -67,8 +67,8 @@ public class MainWindow : Window, IDisposable
                 var DEF = (new List<double> { Math.Max(Defense, Magical_Defense), Defense, Magical_Defense });
                 foreach (var Mechanic in Mechanics)
                 {
-                    var Data = Plugin.Average(Mechanic);
-                    var Damage = Data.Item1 * (Plugin.Configuration.Raw ? 1.0 : DEF[Data.Item2]);
+                    var Data = Plugin.Maximum_Damage(Mechanic);
+                    var Damage = Data.Item1 * (Plugin.Configuration.Raw ? 1.0 : DEF[Data.Item2]) / 1.05;
                     ImGui.Text(Mechanic + ": " + (int)(Damage * 0.95) + " → " + (int)(Damage * 1.05) + " " + Types[Data.Item2]);
                 }
             }

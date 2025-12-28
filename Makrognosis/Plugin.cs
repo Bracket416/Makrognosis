@@ -55,9 +55,9 @@ public sealed class Plugin : IDalamudPlugin
         return Previous;
     }
 
-    public Tuple<double, int> Average(string Name)
+    public Tuple<double, int> Maximum_Damage(string Name)
     {
-        return Drawing.Get_Mechanic_Average(Name);
+        return Drawing.Get_Mechanic_Damage(Name);
     }
 
     private void Message(XivChatType type, int timestamp, ref SeString sender, ref SeString message, ref bool isHandled)
